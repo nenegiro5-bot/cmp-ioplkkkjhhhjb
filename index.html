@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web File Manager (Secure Multi-Layer)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        /* 🎨 1. ส่วนควบคุมพื้นหลังและหน้าตาเว็บ (คงเดิม) */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            overflow: hidden;
+        }
+
+        .box-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 🔒 2. หน้าต่างล็อกอินรหัส 5 ชั้น */
+        #login-screen { display: block; }
+        
+        .password-group {
+            text-align: left;
+            margin-bottom: 12px;
+        }
+        
+        .password-group label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #4a5568;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        /* 📁 3. หน้าต่างจัดการไฟล์ (คงเดิม) */
+        #main-screen { display: none; }
+        
+        .btn {
+            background-color: #6c5ce7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+        .btn:hover { background-color: #5649c0; }
+
+        .file-list {
+            text-align: left;
+            margin-top: 20px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            background: #f9f9f9;
+            margin-bottom: 5px;
+            border-radius: 6px;
+        }
+
+        .delete-btn {
+            background-color: #ff7675;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* 💥 4. เอฟเฟกต์ Flashbang */
+        #flash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: white;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #flash-overlay.active {
+            visibility: visible;
+            opacity: 1;
+            transition: opacity 0s;
+        }
+
+        #flash-overlay.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            /* ⏱️ ปรับตรงนี้ให้สัมพันธ์กับตอนจางหายเสร็จสิ้น */
+            transition: opacity 5s ease-out; 
+        }
+
+        #pop-image {
+            max-width: 80%;
+            max-height: 80%;
+            transform: scale(0);
+            transition: transform 0.1s ease-out;
+        }
+
+        #flash-overlay.active #pop-image {
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="flash-overlay">
+        <img id="pop-image" src="ipad.png" alt="Wrong Password!">
+    </div>
+
+    <audio id="explosion-sound" src="explosion.mp3" preload="auto"></audio>
+
+    <div class="box-container">
+        
+        <div id="login-screen">
+            <h2>ระบบป้องกันแน่นหนา 5 ชั้น</h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 20px;">กรุณากรอกรหัสผ่านให้ถูกต้องครบทุกช่อง</p>
+            
+            <div class="password-group">
+                <label>🔐 รหัสผ่านชั้นที่ 1</label>
+                <input type="password" id="pw1" class="input-field" placeholder="กรอกรหัสชั้นที่ 1...">
+            </div>
+            
+            <div class="password-group">
+                <label>🔐 รหัสผ่านชั้นที่ 2</label>
+                <input type="password" id="pw2" class="input-field" placeholder="กรอกรหัสชั้นที่ 2...">
+            </div>
+            
+            <div class="password-group">
+                <label>🔐 รหัสผ่านชั้นที่ 3</label>
+                <input type="password" id="pw3" class="input-field" placeholder="กรอกรหัสชั้นที่ 3...">
+            </div>
+            
+            <div class="password-group">
+                <label>🔐 รหัสผ่านชั้นที่ 4</label>
+                <input type="password" id="pw4" class="input-field" placeholder="กรอกรหัสชั้นที่ 4...">
+            </div>
+            
+            <div class="password-group">
+                <label>🔐 รหัสผ่านชั้นที่ 5</label>
+                <input type="password" id="pw5" class="input-field" placeholder="กรอกรหัสชั้นที่ 5...">
+            </div>
+
+            <button class="btn" onclick="secureCheckAllPasswords()">ยืนยันรหัสผ่าน</button>
+            <p id="error-msg" style="color: red; display: none; margin-top: 10px;">❌ มีรหัสผ่านบางช่องไม่ถูกต้อง!</p>
+        </div>
+
+        <div id="main-screen">
+            <h2>คลังเก็บไฟล์ส่วนตัว</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">อัปโหลด ดาวน์โหลด หรือลบไฟล์ได้จากหน้านี้</p>
+            
+            <input type="file" id="file-uploader" style="display: none;" onchange="uploadFile(this)">
+            <button class="btn" onclick="document.getElementById('file-uploader').click()">➕ อัปโหลดไฟล์ใหม่</button>
+
+            <div class="file-list" id="file-list-container"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // 🔒 รหัสผ่านที่ถูกเข้ารหัสลับ (ฮอต1 - ฮอต5 เหมือนเดิม)
+        const SECURE_HASHES = {
+            layer1: "c15984361604d902249c6b774d15b389b8ca21cca9513f5695a2f637e6120ede", 
+            layer2: "c15984361604d902249c6b774d15b389b8ca21cca9513f5695a2f637e6120ede", 
+            layer3: "c15984361604d902249c6b774d15b389b8ca21cca9513f5695a2f637e6120ede", 
+            layer4: "c15984361604d902249c6b774d15b389b8ca21cca9513f5695a2f637e6120ede", 
+            layer5: "c15984361604d902249c6b774d15b389b8ca21cca9513f5695a2f637e6120ede"  
+        };
+
+        let fileDatabase = JSON.parse(localStorage.getItem('web_files')) || [];
+
+        function secureCheckAllPasswords() {
+            const hash1 = CryptoJS.SHA256(document.getElementById('pw1').value).toString();
+            const hash2 = CryptoJS.SHA256(document.getElementById('pw2').value).toString();
+            const hash3 = CryptoJS.SHA256(document.getElementById('pw3').value).toString();
+            const hash4 = CryptoJS.SHA256(document.getElementById('pw4').value).toString();
+            const hash5 = CryptoJS.SHA256(document.getElementById('pw5').value).toString();
+
+            if (
+                hash1 === SECURE_HASHES.layer1 &&
+                hash2 === SECURE_HASHES.layer2 &&
+                hash3 === SECURE_HASHES.layer3 &&
+                hash4 === SECURE_HASHES.layer4 &&
+                hash5 === SECURE_HASHES.layer5
+            ) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-screen').style.display = 'block';
+                document.getElementById('error-msg').style.display = 'none';
+                renderFiles();
+            } else {
+                triggerFlashbang();
+            }
+        }
+
+        // 💥 ฟังก์ชันปรับเวลาให้จอขาวค้างเต็มตาประมาณ 5 วินาทีตามสั่ง
+        function triggerFlashbang() {
+            const overlay = document.getElementById('flash-overlay');
+            const sound = document.getElementById('explosion-sound');
+            document.getElementById('error-msg').style.display = 'block';
+
+            for(let i=1; i<=5; i++) {
+                document.getElementById(`pw${i}`).value = '';
+            }
+
+            // จอสว่างวาบและเล่นเสียงระเบิดทันที
+            overlay.className = 'active';
+            sound.currentTime = 0; 
+            sound.play().catch(e => console.log("Audio deferred"));
+
+            // รูปภาพเด้งขึ้นมาแกล้ง และจางตัวหดลงไปใน 1 วินาที
+            setTimeout(() => {
+                document.getElementById('pop-image').style.transform = 'scale(0)';
+            }, 1000);
+
+            // ⏱️ ล็อกให้หน้าจอขาวจ้าเต็มจอนานขึ้นเป็น 5 วินาที (5000 มิลลิวินาที) ก่อนที่จะค่อยๆ สั่งสลายตัวหายไป
+            setTimeout(() => {
+                overlay.className = 'fade-out';
+                setTimeout(() => {
+                    overlay.className = '';
+                    document.getElementById('pop-image').style.transform = '';
+                }, 5000); // จางหายสมบูรณ์ที่ 5 วินาที
+            }, 5000); 
+        }
+
+        // ระบบคลังไฟล์ (คงเดิม)
+        function uploadFile(element) {
+            const file = element.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = {
+                    id: Date.now(),
+                    name: file.name,
+                    size: (file.size / 1024).toFixed(1) + " KB",
+                    content: e.target.result
+                };
+                fileDatabase.push(fileData);
+                saveAndRender();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function deleteFile(id) {
+            if(confirm("คุณแน่ใจใช่ไหมว่าจะลบไฟล์นี้?")) {
+                fileDatabase = fileDatabase.filter(file => file.id !== id);
+                saveAndRender();
+            }
+        }
+
+        function saveAndRender() {
+            localStorage.setItem('web_files', JSON.stringify(fileDatabase));
+            renderFiles();
+        }
+
+        function renderFiles() {
+            const container = document.getElementById('file-list-container');
+            container.innerHTML = '';
+
+            if (fileDatabase.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#999;">ยังไม่มีไฟล์ในระบบ</p>';
+                return;
+            }
+
+            fileDatabase.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    <div>
+                        <a href="${file.content}" download="${file.name}" style="text-decoration:none; color:#333; font-weight:bold;">📄 ${file.name}</a>
+                        <span style="font-size:11px; color:#999; display:block;">(${file.size})</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteFile(${file.id})">ลบ</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+    </script>
+</body>
+</html>
